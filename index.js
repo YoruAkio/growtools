@@ -681,9 +681,18 @@ function process_item_encoder(result, using_txt) {
 function item_encoder(file, using_txt) {
     const fileContent = fs.readFileSync(file, 'utf-8');
     try {
+        let parsedContent;
+        if (!using_txt) {
+            try {
+                parsedContent = JSON.parse(fileContent);
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+                return;
+            }
+        }
         const encodedBuffer = using_txt
             ? process_item_encoder(fileContent, 1)
-            : process_item_encoder(JSON.parse(fileContent), 0);
+            : process_item_encoder(parsedContent, 0);
         fs.writeFileSync('items.dat', encodedBuffer);
         console.log('items.dat encoded successfully!');
     } catch (error) {
@@ -994,9 +1003,34 @@ function item_decoder(file, using_txt) {
     console.log('items.dat decoded successfully!');
 }
 
+function item_info(file) {
+    const buffer = fs.readFileSync(file);
+    const arrayBuffer = new Uint8Array(buffer);
+    let mem_pos = 6;
+    const data_json = {};
+
+    const version = read_buffer_number(arrayBuffer, 0, 2);
+    const item_count = read_buffer_number(arrayBuffer, 2, 4);
+
+    if (version > 18) {
+        console.error(
+            'Your items.dat version is ' +
+                version +
+                ', and This decoder doesnt support that version!',
+        );
+        return;
+    }
+
+    data_json.version = version;
+    data_json.item_count = item_count;
+
+    return console.log(data_json);
+}
+
 program
     .option('-e, --encode', 'Encode items.dat')
     .option('-d, --decode', 'Decode items.dat')
+    .option('-i, --info', 'Get items.dat info')
     .option('-f, --file <file>', 'Path to items.dat file')
     .option('-t, --txt', 'Use text format for decoding/encoding');
 
@@ -1008,6 +1042,8 @@ if (options.encode) {
     item_encoder(options.file, options.txt);
 } else if (options.decode) {
     item_decoder(options.file, options.txt);
+} else if (options.info) {
+    item_info(options.file);
 } else {
     console.error('Please specify either -encode or -decode flag');
 }

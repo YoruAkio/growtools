@@ -3,25 +3,21 @@ const { program } = require('commander');
 
 const items_secret_key = 'PBG892FXX982ABC*';
 
-// Helper functions
 const byteToHex = [];
 for (let n = 0; n <= 0xff; ++n) {
-    const hexOctet = n.toString(16).padStart(2, '0');
-    byteToHex.push(hexOctet);
+    byteToHex.push(n.toString(16).padStart(2, '0'));
 }
 
-function hex(arrayBuffer, is_without_space = false) {
+function hex(arrayBuffer, is_without_space) {
     const buff = new Uint8Array(arrayBuffer);
     const hexOctets = [];
     for (let i = 0; i < buff.length; ++i) hexOctets.push(byteToHex[buff[i]]);
-
     return hexOctets.join(is_without_space ? '' : ' ');
 }
 
 function read_buffer_number(buffer, pos, len) {
     let value = 0;
     for (let a = 0; a < len; a++) value += buffer[pos + a] << (a * 8);
-
     return value;
 }
 
@@ -33,64 +29,44 @@ function write_buffer_number(pos, len, value, buffer) {
 
 function write_buffer_string(pos, len, value, using_key, item_id, buffer) {
     for (let a = 0; a < len; a++) {
-        if (using_key) {
-            buffer[pos + a] =
-                value.charCodeAt(a) ^
-                items_secret_key.charCodeAt(
-                    (a + item_id) % items_secret_key.length,
-                );
-        } else {
-            buffer[pos + a] = value.charCodeAt(a);
-        }
+        buffer[pos + a] = using_key
+            ? value.charCodeAt(a) ^
+              items_secret_key.charCodeAt(
+                  (a + item_id) % items_secret_key.length,
+              )
+            : value.charCodeAt(a);
     }
 }
 
 function hexStringToArrayBuffer(pos, hexString, buffer) {
-    // remove the space
     hexString = hexString.replace(/ /g, '');
-    if (hexString.length % 2 != 0)
+    if (hexString.length % 2 !== 0)
         console.log(
             'WARNING: expecting an even number of characters in the hexString',
         );
-
-    // check for some non-hex characters
-    var bad = hexString.match(/[G-Z\s]/i);
-    if (bad) console.log('WARNING: found non-hex characters', bad);
-
-    // convert the octets to integers
-    hexString.match(/[\dA-F]{2}/gi).map(function (s) {
-        buffer[pos++] = parseInt(s, 16);
-    });
+    hexString.match(/[\dA-F]{2}/gi).map(s => (buffer[pos++] = parseInt(s, 16)));
 }
 
 function read_buffer_string(buffer, pos, len, using_key, item_id) {
     let result = '';
-    if (using_key) {
-        for (let a = 0; a < len; a++) {
-            result += String.fromCharCode(
-                buffer[a + pos] ^
-                    items_secret_key.charCodeAt(
-                        (item_id + a) % items_secret_key.length,
-                    ),
-            );
-        }
-    } else {
-        for (let a = 0; a < len; a++) {
-            result += String.fromCharCode(buffer[a + pos]);
-        }
+    for (let a = 0; a < len; a++) {
+        result += String.fromCharCode(
+            using_key
+                ? buffer[a + pos] ^
+                      items_secret_key.charCodeAt(
+                          (item_id + a) % items_secret_key.length,
+                      )
+                : buffer[a + pos],
+        );
     }
-
     return result;
 }
 
-// Data processing functions
 function process_item_encoder(result, using_txt) {
-    const buffer = new Uint8Array(Buffer.alloc(1024 * 1024)); // Allocate a large buffer
+    const buffer = new Uint8Array(1024 * 1024); // Allocate a large buffer
     let mem_pos = 6;
-
     if (using_txt) {
         const resultLines = result.split('\n');
-
         for (let a = 0; a < resultLines.length; a++) {
             const result1 = resultLines[a].split('\\');
             if (result1[0] == 'version') {
@@ -148,11 +124,9 @@ function process_item_encoder(result, using_txt) {
                 buffer[mem_pos++] = Number(result1[15]); // collision type
 
                 // break hits
-                if (result1[16].includes('r')) {
-                    buffer[mem_pos++] = Number(result1[16].slice(0, -1));
-                } else {
-                    buffer[mem_pos++] = Number(result1[16]);
-                }
+                buffer[mem_pos++] = result1[16].includes('r')
+                    ? Number(result1[16].slice(0, -1))
+                    : Number(result1[16]);
 
                 // drop chance
                 write_buffer_number(mem_pos, 4, result1[17], buffer);
@@ -407,16 +381,11 @@ function process_item_encoder(result, using_txt) {
             buffer[mem_pos++] = result.items[a].is_stripey_wallpaper;
             buffer[mem_pos++] = result.items[a].collision_type;
 
-            if (
+            buffer[mem_pos++] =
                 isNaN(result.items[a].break_hits) &&
                 result.items[a].break_hits.includes('r')
-            ) {
-                buffer[mem_pos++] = Number(
-                    result.items[a].break_hits.slice(0, -1),
-                );
-            } else {
-                buffer[mem_pos++] = Number(result.items[a].break_hits) * 6;
-            }
+                    ? Number(result.items[a].break_hits.slice(0, -1))
+                    : Number(result.items[a].break_hits) * 6;
 
             write_buffer_number(
                 mem_pos,
@@ -428,7 +397,6 @@ function process_item_encoder(result, using_txt) {
             buffer[mem_pos++] = result.items[a].clothing_type;
             write_buffer_number(mem_pos, 2, result.items[a].rarity, buffer);
             mem_pos += 2;
-
             buffer[mem_pos++] = result.items[a].max_amount;
             write_buffer_number(
                 mem_pos,
@@ -682,21 +650,16 @@ function process_item_encoder(result, using_txt) {
             }
         }
     }
-
     return buffer.buffer;
 }
 
 function item_encoder(file, using_txt) {
     const fileContent = fs.readFileSync(file, 'utf-8');
     try {
-        if (using_txt) {
-            const encodedBuffer = process_item_encoder(fileContent, 1);
-            fs.writeFileSync('items.dat', encodedBuffer);
-        } else {
-            const parsedData = JSON.parse(fileContent);
-            const encodedBuffer = process_item_encoder(parsedData, 0);
-            fs.writeFileSync('items.dat', encodedBuffer);
-        }
+        const encodedBuffer = using_txt
+            ? process_item_encoder(fileContent, 1)
+            : process_item_encoder(JSON.parse(fileContent), 0);
+        fs.writeFileSync('items.dat', encodedBuffer);
         console.log('items.dat encoded successfully!');
     } catch (error) {
         console.error('Error encoding items.dat:', error);
@@ -765,11 +728,7 @@ function item_decoder(file, using_txt) {
         const collision_type = arrayBuffer[mem_pos++];
         let break_hits = arrayBuffer[mem_pos++];
 
-        if (break_hits % 6 !== 0) {
-            break_hits = break_hits + 'r';
-        } else {
-            break_hits = break_hits / 6;
-        }
+        break_hits = break_hits % 6 !== 0 ? break_hits + 'r' : break_hits / 6;
 
         const drop_chance = read_buffer_number(arrayBuffer, mem_pos, 4);
         mem_pos += 4;
@@ -898,15 +857,12 @@ function item_decoder(file, using_txt) {
                 using_txt,
             ).toUpperCase();
             mem_pos += 25;
-
             len = read_buffer_number(arrayBuffer, mem_pos, 2);
             mem_pos += 2;
             str_version_15 = read_buffer_string(arrayBuffer, mem_pos, len);
             mem_pos += len;
         }
         if (version >= 16) {
-            // ... (previous code)
-
             len = read_buffer_number(arrayBuffer, mem_pos, 2);
             mem_pos += 2;
             str_version_16 = read_buffer_string(arrayBuffer, mem_pos, len);
@@ -923,7 +879,7 @@ function item_decoder(file, using_txt) {
             mem_pos += 4;
         }
 
-        if (item_id != a) {
+        if (item_id !== a) {
             console.log(`Unordered Items at ${a}`);
         }
 
@@ -968,17 +924,18 @@ function item_decoder(file, using_txt) {
                 a
             ].seed_overlay_color = `${seed_overlay_color_a},${seed_overlay_color_r},${seed_overlay_color_g},${seed_overlay_color_b}`;
         } else {
-            data_json.items[a].seed_color = {};
-            data_json.items[a].seed_color.a = seed_color_a;
-            data_json.items[a].seed_color.r = seed_color_r;
-            data_json.items[a].seed_color.g = seed_color_g;
-            data_json.items[a].seed_color.b = seed_color_b;
-
-            data_json.items[a].seed_overlay_color = {};
-            data_json.items[a].seed_overlay_color.a = seed_overlay_color_a;
-            data_json.items[a].seed_overlay_color.r = seed_overlay_color_r;
-            data_json.items[a].seed_overlay_color.g = seed_overlay_color_g;
-            data_json.items[a].seed_overlay_color.b = seed_overlay_color_b;
+            data_json.items[a].seed_color = {
+                a: seed_color_a,
+                r: seed_color_r,
+                g: seed_color_g,
+                b: seed_color_b,
+            };
+            data_json.items[a].seed_overlay_color = {
+                a: seed_overlay_color_a,
+                r: seed_overlay_color_r,
+                g: seed_overlay_color_g,
+                b: seed_overlay_color_b,
+            };
         }
 
         data_json.items[a].grow_time = grow_time;
@@ -999,28 +956,19 @@ function item_decoder(file, using_txt) {
         data_json.items[a].int_version_18 = int_version_18;
     }
 
-    if (using_txt) {
-        let to_txt_result = `//Credit: IProgramInCPP & GrowtopiaNoobs\n//Format: add_item\\${Object.keys(
-            data_json.items[0],
-        ).join(
-            '\\',
-        )}\n//NOTE: There are several items, for the breakhits part, add 'r'.\n//Example: 184r\n//What does it mean? So, adding 'r' to breakhits makes it raw breakhits, meaning, if you add 'r' to breakhits, when encoding items.dat, the encoder won't multiply it by 6.\n\nversion\\${
-            data_json.version
-        }\nitemCount\\${data_json.item_count}\n\n`;
-        for (let a = 0; a < item_count; a++) {
-            to_txt_result +=
-                'add_item\\' +
-                Object.values(data_json.items[a]).join('\\') +
-                '\n';
-        }
-        fs.writeFileSync('items.txt', to_txt_result);
-    } else {
-        fs.writeFileSync('items.json', JSON.stringify(data_json, null, 4));
-    }
+    fs.writeFileSync(
+        using_txt ? 'items.txt' : 'items.json',
+        using_txt
+            ? `version\\${data_json.version}\nitemCount\\${
+                  data_json.item_count
+              }\n\n${data_json.items
+                  .map(item => `add_item\\${Object.values(item).join('\\')}`)
+                  .join('\n')}`
+            : JSON.stringify(data_json, null, 4),
+    );
     console.log('items.dat decoded successfully!');
 }
 
-// Command line interface setup
 program
     .option('-e, --encode', 'Encode items.dat')
     .option('-d, --decode', 'Decode items.dat')

@@ -29,12 +29,15 @@ function write_buffer_number(pos, len, value, buffer) {
 
 function write_buffer_string(pos, len, value, using_key, item_id, buffer) {
     for (let a = 0; a < len; a++) {
-        buffer[pos + a] = using_key
-            ? value.charCodeAt(a) ^
-              items_secret_key.charCodeAt(
-                  (a + item_id) % items_secret_key.length,
-              )
-            : value.charCodeAt(a);
+        if (using_key) {
+            buffer[pos + a] =
+                value.charCodeAt(a) ^
+                items_secret_key.charCodeAt(
+                    (a + item_id) % items_secret_key.length,
+                );
+        } else {
+            buffer[pos + a] = value.charCodeAt(a);
+        }
     }
 }
 
@@ -362,6 +365,8 @@ function process_item_encoder(result, using_txt) {
                 mem_pos,
                 result.items[a].texture.length,
                 result.items[a].texture,
+                1,
+                result.items[a].item_id,
                 buffer,
             );
             mem_pos += result.items[a].texture.length;
@@ -405,12 +410,12 @@ function process_item_encoder(result, using_txt) {
                 buffer,
             );
             mem_pos += 2;
-            write_buffer_string(
-                mem_pos,
-                result.items[a].extra_file.length,
-                result.items[a].extra_file,
-                buffer,
-            );
+            // write_buffer_string(
+            //     mem_pos,
+            //     result.items[a].extra_file.length,
+            //     result.items[a].extra_file,
+            //     buffer,
+            // );
             mem_pos += result.items[a].extra_file.length;
             write_buffer_number(
                 mem_pos,
@@ -437,6 +442,8 @@ function process_item_encoder(result, using_txt) {
                 mem_pos,
                 result.items[a].pet_name.length,
                 result.items[a].pet_name,
+                0,
+                0,
                 buffer,
             );
             mem_pos += result.items[a].pet_name.length;
@@ -451,6 +458,8 @@ function process_item_encoder(result, using_txt) {
                 mem_pos,
                 result.items[a].pet_prefix.length,
                 result.items[a].pet_prefix,
+                0,
+                0,
                 buffer,
             );
             mem_pos += result.items[a].pet_prefix.length;
@@ -465,6 +474,8 @@ function process_item_encoder(result, using_txt) {
                 mem_pos,
                 result.items[a].pet_suffix.length,
                 result.items[a].pet_suffix,
+                0,
+                0,
                 buffer,
             );
             mem_pos += result.items[a].pet_suffix.length;
@@ -479,6 +490,8 @@ function process_item_encoder(result, using_txt) {
                 mem_pos,
                 result.items[a].pet_ability.length,
                 result.items[a].pet_ability,
+                0,
+                0,
                 buffer,
             );
             mem_pos += result.items[a].pet_ability.length;
@@ -513,6 +526,8 @@ function process_item_encoder(result, using_txt) {
                 mem_pos,
                 result.items[a].extra_options.length,
                 result.items[a].extra_options,
+                0,
+                0,
                 buffer,
             );
             mem_pos += result.items[a].extra_options.length;
@@ -527,6 +542,8 @@ function process_item_encoder(result, using_txt) {
                 mem_pos,
                 result.items[a].texture2.length,
                 result.items[a].texture2,
+                0,
+                0,
                 buffer,
             );
             mem_pos += result.items[a].texture2.length;
@@ -541,6 +558,8 @@ function process_item_encoder(result, using_txt) {
                 mem_pos,
                 result.items[a].extra_options2.length,
                 result.items[a].extra_options2,
+                0,
+                0,
                 buffer,
             );
             mem_pos += result.items[a].extra_options2.length;
@@ -562,6 +581,8 @@ function process_item_encoder(result, using_txt) {
                     mem_pos,
                     result.items[a].punch_options.length,
                     result.items[a].punch_options,
+                    0,
+                    0,
                     buffer,
                 );
                 mem_pos += result.items[a].punch_options.length;
@@ -610,6 +631,8 @@ function process_item_encoder(result, using_txt) {
                     mem_pos,
                     result.items[a].str_version_15.length,
                     result.items[a].str_version_15,
+                    0,
+                    0,
                     buffer,
                 );
                 mem_pos += result.items[a].str_version_15.length;
@@ -626,6 +649,8 @@ function process_item_encoder(result, using_txt) {
                     mem_pos,
                     result.items[a].str_version_16.length,
                     result.items[a].str_version_16,
+                    0,
+                    0,
                     buffer,
                 );
                 mem_pos += result.items[a].str_version_16.length;
